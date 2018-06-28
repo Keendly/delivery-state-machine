@@ -1,0 +1,96 @@
+{
+    "Comment": "Delivery flow",
+    "StartAt": "ExtractArticles",
+    "States": {
+        "ExtractArticles": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:eu-west-1:MY_ACCOUNT_ID:function:veles",
+            "InputPath": "$",
+            "ResultPath": "$.extractResult",
+            "OutputPath": "$",
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "Next": "ExtractArticleFallback",
+                    "ResultPath": "$.error"
+                }
+            ],
+            "Next": "GenerateActionLinks"
+        },
+        "ExtractArticleFallback": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:eu-west-1:MY_ACCOUNT_ID:function:veles_fallback",
+            "InputPath": "$",
+            "ResultPath": "$.extractResult",
+            "OutputPath": "$",
+            "Next": "GenerateActionLinks"
+        },
+        "GenerateActionLinks": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:eu-west-1:MY_ACCOUNT_ID:function:action-api",
+            "InputPath": "$",
+            "ResultPath": "$.actionLinks",
+            "OutputPath": "$",
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "Next": "PrepareEbook",
+                    "ResultPath": "$.error"
+                }
+            ],
+            "Next": "PrepareEbook"
+        },
+        "PrepareEbook": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:eu-west-1:MY_ACCOUNT_ID:function:morana",
+            "InputPath": "$",
+            "ResultPath": "$.prepareResult",
+            "OutputPath": "$",
+            "Next": "GenerateEbook"
+        },
+        "GenerateEbook": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:eu-west-1:MY_ACCOUNT_ID:activity:GenerateEbook",
+            "TimeoutSeconds": 660,
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "IntervalSeconds": 60,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 1.5
+                }
+            ],
+            "InputPath": "$",
+            "ResultPath": "$.ebook",
+            "OutputPath": "$",
+            "Next": "SendEmail"
+        },
+        "SendEmail": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:eu-west-1:MY_ACCOUNT_ID:function:perun_sf",
+            "InputPath": "$",
+            "ResultPath": "$.sent",
+            "OutputPath": "$",
+            "Next": "UpdateDelivery"
+        },
+        "UpdateDelivery": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:eu-west-1:MY_ACCOUNT_ID:function:bylun",
+            "InputPath": "$",
+            "ResultPath": "$.updated",
+            "OutputPath": "$",
+            "Next": "SendNotification"
+        },
+        "SendNotification": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:eu-west-1:MY_ACCOUNT_ID:function:push-notifier_sf",
+            "End": true
+        }
+    }
+}
